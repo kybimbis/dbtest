@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Тренажер ОКР: Базы Данных</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --surface: #131b2e;
+      --card-bg: #1c2640;
+      --border: #2a3859;
+      --primary: #38bdf8;
+      --primary-dim: rgba(56, 189, 248, 0.12);
+      --correct: #22c55e;
+      --correct-bg: rgba(34, 197, 94, 0.15);
+      --wrong: #ef4444;
+      --wrong-bg: rgba(239, 68, 68, 0.15);
+      --text: #f1f5f9;
+      --subtext: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 90px; }
+    
+    /* Sticky Top Bar */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(11, 15, 25, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+    }
+    .top-inner {
+      max-width: 680px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .stat-badge {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--subtext);
+    }
+    .stat-badge span { color: var(--primary); }
+    .btn-stats-toggle {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .progress-track {
+      width: 100%;
+      height: 4px;
+      background: var(--surface);
+      margin-top: 8px;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), var(--correct));
+      transition: width 0.3s ease;
+    }
+
+    /* Layout */
+    .container { max-width: 680px; margin: 0 auto; padding: 16px; }
+    .header-text { margin-bottom: 20px; text-align: left; }
+    .header-text h1 { font-size: 1.35rem; color: #fff; margin-bottom: 4px; }
+    .header-text p { font-size: 0.85rem; color: var(--subtext); }
+
+    /* Stats Panel (Drawer / Modal) */
+    .stats-drawer {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    .stats-drawer.open { display: block; }
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .metric-box {
+      background: var(--card-bg);
+      padding: 10px 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .metric-box .num { font-size: 1.1rem; font-weight: 700; }
+    .metric-box .lbl { font-size: 0.72rem; color: var(--subtext); margin-top: 2px; }
+    .metric-green { color: var(--correct); }
+    .metric-red { color: var(--wrong); }
+    .metric-blue { color: var(--primary); }
+
+    .matrix-title { font-size: 0.78rem; text-transform: uppercase; color: var(--subtext); margin-bottom: 8px; }
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 6px;
+    }
+    .matrix-item {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--subtext);
+    }
+    .matrix-item.is-correct { background: var(--correct-bg); border-color: var(--correct); color: var(--correct); }
+    .matrix-item.is-wrong { background: var(--wrong-bg); border-color: var(--wrong); color: var(--wrong); }
+
+    /* Sections & Cards */
+    .section-header {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      margin: 28px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 16px;
+      scroll-margin-top: 75px;
+    }
+    .card-title {
+      font-size: 0.96rem;
+      font-weight: 600;
+      line-height: 1.45;
+      margin-bottom: 14px;
+      color: #fff;
+    }
+    .options { display: flex; flex-direction: column; gap: 8px; }
+    .opt-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+      line-height: 1.35;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .opt-btn:active { background: #1f2b48; }
+    .opt-btn.correct { background: var(--correct-bg); border-color: var(--correct); color: #4ade80; font-weight: 600; }
+    .opt-btn.wrong { background: var(--wrong-bg); border-color: var(--wrong); color: #f87171; }
+    .options.disabled { pointer-events: none; }
+
+    .expl-box {
+      margin-top: 12px;
+      padding: 12px;
+      background: #0f1626;
+      border-left: 3px solid var(--primary);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: #cbd5e1;
+      display: none;
+    }
+    .expl-box.show { display: block; }
+    .btn-reset {
+      margin: 20px 0;
+      width: 100%;
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--subtext);
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-bar">
+    <div class="top-inner">
+      <div class="stat-badge">Пройдено: <span id="hdr-progress">0/50</span> | <span id="hdr-pct">0%</span></div>
+      <button class="btn-stats-toggle" id="toggle-stats-btn">Статистика</button>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header-text">
+      <h1>Комплексный тест по БД (ОКР)</h1>
+      <p>50 вопросов по архитектуре, SQL, оптимизации, транзакциям и NoSQL</p>
+    </div>
+
+    <div class="stats-drawer" id="stats-drawer">
+      <div class="stats-summary">
+        <div class="metric-box">
+          <div class="num metric-blue" id="stat-total">0</div>
+          <div class="lbl">Решено</div>
+        </div>
+        <div class="metric-box">
+          <div class="num metric-green" id="stat-correct">0</div>
+          <div class="lbl">Верно</div>
+        </div>
+        <div class="metric-box">
+          <div class="num metric-red" id="stat-wrong">0</div>
+          <div class="lbl">Ошибок</div>
+        </div>
+      </div>
+      <div class="matrix-title">Навигация по вопросам:</div>
+      <div class="matrix-grid" id="matrix-grid"></div>
+    </div>
+
+    <div id="questions-root"></div>
+
+    <button class="btn-reset" onclick="resetQuiz()">Сбросить весь прогресс</button>
+  </div>
+
+  <script>
+    const questions = [
+      /* РАЗДЕЛ 1: Проектирование и нормализация */
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "1. На каком этапе проектирования базы данных структура становится зависимой от конкретной СУБД (PostgreSQL, MySQL, MS SQL Server)?",
+        o: ["На концептуальном этапе", "На логическом этапе", "На физическом этапе", "Структура никогда не зависит от СУБД"],
+        a: 2,
+        e: "Концептуальный (ER) и логический этапы абстрактны. Выбор диалекта СУБД, аппаратных структур, типов данных (NVARCHAR, CLOB) и индексов выполняется на физическом этапе."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "2. В таблице заказов поле phones содержит значение '89161112233, 89254445566'. Какая нормальная форма нарушена?",
+        o: ["1НФ", "2НФ", "3НФ", "Таблица не нарушает нормальных форм"],
+        a: 0,
+        e: "1-я нормальная форма требует неделимости (атомарности) атрибутов в каждой строке."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "3. В таблице студентов есть поля: id_студента, номер_группы, название_факультета. Зависимость: Студент -> Группа -> Факультет. Какая нормальная форма нарушена?",
+        o: ["1НФ, нарушена атомарность", "2НФ, есть неполная функциональная зависимость", "3НФ, присутствует транзитивная зависимость неключевого атрибута от ПК", "3НФ, так как ПК составной"],
+        a: 2,
+        e: "Факультет зависит от Группы, а Группа — от Студента. Транзитивная зависимость неключевого атрибута от ПК нарушает 3НФ."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "4. Таблица находится в 1НФ и имеет составной первичный ключ (Курс_ID, Студент_ID). Столбец 'Продолжительность_курса' зависит только от Курс_ID. Какая НФ нарушена?",
+        o: ["Нарушена 2НФ", "Нарушена 3НФ", "Нарушена BCNF", "Ничего не нарушено, если нет транзитивности"],
+        a: 0,
+        e: "2НФ требует отсутствия частичной зависимости неключевых атрибутов от части составного первичного ключа."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "5. Чем нормальная форма Бойса-Кодда (BCNF) строже третьей нормальной формы (3НФ)?",
+        o: ["Она запрещает использовать составные первичные ключи", "В BCNF в любой нетривиальной зависимости X -> Y детерминант X обязан являться суперключом", "BCNF требует разделения всех числовых и строковых полей", "BCNF применяется исключительно в графовых базах данных"],
+        a: 1,
+        e: "В 3НФ атрибут Y может быть первичным (входить в потенциальный ключ), даже если X — не суперключ. BCNF этого исключения не допускает."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "6. Что характеризует денормализацию реляционной базы данных?",
+        o: ["Исправление ошибок 1НФ", "Осознанное внесение избыточности для ускорения операций чтения (SELECT)", "Удаление всех внешних ключей (FK) из базы", "Переход на хранение всех данных в JSON"],
+        a: 1,
+        e: "Денормализация уменьшает число JOIN при чтении, жертвуя скоростью вставок, обновления и требуя контроля аномалий."
+      },
+      {
+        s: "Раздел 1. Проектирование БД и нормализация",
+        q: "7. Что такое суррогатный ключ (Surrogate Key)?",
+        o: ["Ключ, составленный из естественных реквизитов (например, серия и номер паспорта)", "Искусственно созданное уникальное поле (например, автоинкремент ID или UUID), не несущее бизнес-смысла", "Внешний ключ, ссылающийся сам на свою же таблицу", "Ключ, который не проверяется СУБД на уникальность"],
+        a: 1,
+        e: "Суррогатный ключ автономен от бизнес-логики и защищает архитектуру от смены форматов паспортов, ИНН и названий."
+      },
+
+      /* РАЗДЕЛ 2: SQL, фильтрация и соединения */
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "8. Каков правильный логический порядок выполнения предложений в SQL-запросе СУБД?",
+        o: ["SELECT -> FROM -> WHERE -> GROUP BY -> HAVING -> ORDER BY", "FROM -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY", "FROM -> GROUP BY -> WHERE -> SELECT -> HAVING -> ORDER BY", "FROM -> SELECT -> WHERE -> GROUP BY -> HAVING -> ORDER BY"],
+        a: 1,
+        e: "Сначала считываются таблицы (FROM), фильтруются строки (WHERE), группируются (GROUP BY), фильтруются группы (HAVING), формируется проекция (SELECT) и упорядочивается (ORDER BY)."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "9. Чем принципиально отличается условие в WHERE от условия в HAVING?",
+        o: ["WHERE фильтрует группы, а HAVING — отдельные строки", "WHERE выполняется до группировки строк, а HAVING — после группировки сформированных групп", "В WHERE можно использовать агрегаты (SUM, AVG), а в HAVING — нет", "Разницы нет, оптимизатор СУБД считает их синонимами"],
+        a: 1,
+        e: "В WHERE агрегатные функции запрещены (группы еще не сформированы), а HAVING фильтрует уже свернутый набор строк."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "10. Какое соединение вернёт декартово произведение строк (строки таблицы А x строки таблицы Б)?",
+        o: ["INNER JOIN", "FULL OUTER JOIN", "SELF JOIN", "CROSS JOIN"],
+        a: 3,
+        e: "CROSS JOIN без условий ON объединяет каждую строку первой таблицы с абсолютно каждой строкой второй."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "11. В таблице 10 строк, во 2-й таблице 5 строк. Сколько строк вернет запрос с LEFT JOIN, если условие ON никогда не выполнилось (false)?",
+        o: ["0 строк", "5 строк", "10 строк с NULL в полях правой таблицы", "50 строк"],
+        a: 2,
+        e: "LEFT JOIN сохраняет все 10 строк левой таблицы, заполняя значения правой таблицы значениями NULL."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "12. Чем отличается операция UNION от UNION ALL?",
+        o: ["UNION объединяет по колонкам, UNION ALL — по строкам", "UNION производит дедупликацию и сортировку, а UNION ALL оставляет дубликаты и работает быстрее", "UNION ALL быстрее только на SQLite", "UNION запрещен в стандарте ANSI SQL"],
+        a: 1,
+        e: "UNION требует скрытой группировки/сортировки для исключения дубликатов, UNION ALL просто конкатенирует наборы."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "13. Каков результат выражения: NULL = NULL в стандартной трехуровневой логике SQL (3VL)?",
+        o: ["TRUE", "FALSE", "UNKNOWN (NULL)", "Синтаксическая ошибка"],
+        a: 2,
+        e: "NULL — маркер неизвестности. Нельзя приравнять неизвестность к неизвестности, результат — UNKNOWN."
+      },
+      {
+        s: "Раздел 2. Выполнение SQL-запросов и JOIN",
+        q: "14. Что вернет запрос: SELECT COUNT(*), COUNT(col) FROM t, если в таблице 5 строк и в столбце col два значения равны NULL?",
+        o: ["5 и 5", "5 и 3", "3 и 3", "5 и NULL"],
+        a: 1,
+        e: "COUNT(*) считает физические строки, а COUNT(поле) игнорирует строки со значением NULL."
+      },
+
+      /* РАЗДЕЛ 3: Оконные функции и подзапросы */
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "15. Зарплаты: 90 000, 90 000 и 70 000. Какие ранги присвоят RANK() и DENSE_RANK() сотруднику с зарплатой 70 000 (ORDER BY salary DESC)?",
+        o: ["RANK = 2, DENSE_RANK = 2", "RANK = 3, DENSE_RANK = 2", "RANK = 2, DENSE_RANK = 3", "Обе функции вернут 3"],
+        a: 1,
+        e: "RANK делает пропуск при дублях: 1, 1, 3. DENSE_RANK идет без дыр: 1, 1, 2."
+      },
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "16. Чем оконная функция принципиально отличается от группировки через GROUP BY?",
+        o: ["Оконная функция не может вычислять агрегатные значения", "Оконная функция не сворачивает строки выборки в одну, а добавляет вычисленное значение к каждой строке", "Оконная функция выполняется до вычисления условий WHERE", "Оконные функции поддерживаются только в NoSQL СУБД"],
+        a: 1,
+        e: "GROUP BY сжимает строки по числу групп, а OVER() сохраняет каждую запись неизменной."
+      },
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "17. Почему подзапрос с EXISTS часто работает быстрее, чем аналогичный подзапрос с IN, на больших объемах данных?",
+        o: ["EXISTS останавливает сканирование при первом же совпадении (short-circuit), а IN собирает весь список значений", "EXISTS использует оперативную память, а IN пишет во временный файл", "EXISTS отключает валидацию транзакций", "IN не умеет работать с числовыми полями"],
+        a: 0,
+        e: "EXISTS работает по булеву принципу: найдено первое совпадение -> сразу возвращается TRUE."
+      },
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "18. Какая оконная функция позволяет получить значение из ПРЕДЫДУЩЕЙ строки внутри партиции?",
+        o: ["LEAD()", "LAG()", "FIRST_VALUE()", "NTH_VALUE()"],
+        a: 1,
+        e: "LAG(col, offset) смещается назад на offset строк, а LEAD(col, offset) — вперед."
+      },
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "19. Что произойдет в запросе с конструкцией: WHERE col NOT IN (SELECT x FROM t), если подзапрос вернет хотя бы одно значение NULL?",
+        o: ["Запрос проигнорирует NULL и отработает корректно", "Запрос вернет 0 строк (пустой результат) из-за логики 3VL", "Вызов упадет с критической ошибкой выполнения", "СУБД заменит NULL на 0"],
+        a: 1,
+        e: "col NOT IN (...) эквивалентно (col != v1 AND col != NULL). Сравнение с NULL дает UNKNOWN, а AND с UNKNOWN дает FALSE/UNKNOWN."
+      },
+      {
+        s: "Раздел 3. Оконные функции и подзапросы",
+        q: "20. Для чего служит предложение PARTITION BY внутри секции OVER()?",
+        o: ["Для разбиения физической таблицы на разные диски", "Для деления результирующего набора на независимые окна расчетов без схлопывания строк", "Для явного назначения сортировки внутри окна", "Для удаления дубликатов из окна"],
+        a: 1,
+        e: "PARTITION BY определяет логические границы (группы), внутри которых локально рассчитывается оконная функция."
+      },
+
+      /* РАЗДЕЛ 4: Представления (VIEW) */
+      {
+        s: "Раздел 4. Представления (VIEW)",
+        q: "21. Какое из представлений гарантированно является ОБНОВЛЯЕМЫМ (допускает прямой INSERT/UPDATE)?",
+        o: ["Построенное на основе JOIN двух несвязанных таблиц", "Содержащее GROUP BY и HAVING", "Построенное по одной базовой таблице без DISTINCT, агрегатов и подзапросов", "Содержащее конструкцию UNION"],
+        a: 2,
+        e: "При наличии агрегатов, GROUP BY или JOIN СУБД теряет строгое сопоставление строки VIEW с физической строкой таблицы."
+      },
+      {
+        s: "Раздел 4. Представления (VIEW)",
+        q: "22. Для чего используется предложение WITH CHECK OPTION при создании представления?",
+        o: ["Для проверки прав администратора при выборке", "Для запрета INSERT и UPDATE строк, которые не удовлетворяют WHERE-условию этого представления", "Для контроля валидности синтаксиса перед компиляцией", "Для автоматического создания индексов на VIEW"],
+        a: 1,
+        e: "WITH CHECK OPTION гарантирует, что через представление нельзя сохранить данные, которые затем из него же 'исчезнут'."
+      },
+      {
+        s: "Раздел 4. Представления (VIEW)",
+        q: "23. Чем материализованное представление (Materialized View) отличается от стандартного VIEW?",
+        o: ["Материализованное представление шифруется на диске", "Оно физически сохраняет результат выполнения запроса на диск и требует обновления (REFRESH)", "Оно не поддерживает типы данных BIGINT", "Оно не может иметь собственного имени в схеме"],
+        a: 1,
+        e: "Стандартный VIEW — это сохраненный SQL-запрос (виртуальная таблица). Materialized View физически хранит сгенерированные строки."
+      },
+      {
+        s: "Раздел 4. Представления (VIEW)",
+        q: "24. Влияет ли удаление обычного не-материализованного VIEW на данные в исходных базовых таблицах?",
+        o: ["Да, удаляются все связанные строки базовых таблиц", "Нет, удаляется только объект метаданных (определение представления)", "Да, если на представление ссылался внешний ключ", "Зависит от настроек CASCADE"],
+        a: 1,
+        e: "DROP VIEW удаляет только виртуальную схему из системного каталога, данные в таблицах остаются нетронутыми."
+      },
+
+      /* РАЗДЕЛ 5: Индексы и производительность */
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "25. Создан индекс idx_abc ON orders(client_id, status, order_date). В каком запросе индекс НЕ сможет быть использован для поиска?",
+        o: ["WHERE client_id = 5", "WHERE client_id = 5 AND status = 'new'", "WHERE client_id = 5 AND status = 'new' AND order_date = '2026-01-01'", "WHERE status = 'new' AND order_date = '2026-01-01'"],
+        a: 3,
+        e: "Правило левого префикса: составной индекс может использоваться только при фильтрации по самому левому полю (client_id)."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "26. Что такое «покрывающий индекс» (Covering Index)?",
+        o: ["Индекс, построенный по всем столбцам таблицы без исключения", "Индекс, содержащий все поля из SELECT и WHERE, позволяющий СУБД не обращаться к табличным страницам на диске", "Индекс, который автоматически сжимает данные на диске", "Индекс, создаваемый СУБД для внешнего ключа"],
+        a: 1,
+        e: "Если индекс содержит все нужные поля, СУБД читает данные прямо из B-Tree индекса (Using index) без Lookup-обращений к строкам таблицы."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "27. При анализе плана запроса через EXPLAIN в MySQL в столбце type получено значение ALL. Что это означает?",
+        o: ["Запрос оптимизирован и выполняется по Hash-таблице", "Используется уникальный первичный ключ", "Происходит полное сканирование таблицы (Full Table Scan), индексы не задействованы", "Индекс покрывает все поля запроса"],
+        a: 2,
+        e: "type: ALL — худший тип доступа: СУБД последовательно вычитывает каждую страницу таблицы от начала до конца."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "28. Какая базовая структура данных чаще всего используется для стандартных индексов в реляционных СУБД (PostgreSQL, InnoDB)?",
+        o: ["Red-Black Tree", "B-Tree / B+Tree", "Связный список (Linked List)", "Матрица смежности"],
+        a: 1,
+        e: "B+Tree обеспечивает логарифмическую сложность O(log N) и исключительно эффективен для блочного чтения с диска и диапазонных запросов."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "29. Почему выражение WHERE YEAR(created_at) = 2026 обычно приводит к игнорированию индекса по полю created_at?",
+        o: ["Индексы не умеют работать с типами дат", "Применение функции к индексированному столбцу делает предикат не-саргабельным (non-sargable)", "Функция YEAR() блокирует чтение таблицы", "Индекс используется, но с замедлением на 10%"],
+        a: 1,
+        e: "Функция от столбца вынуждает СУБД вычислять ее для каждой строки таблицы. Для использования индекса пишут диапазон: created_at >= '2026-01-01' AND created_at < '2027-01-01'."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "30. Чем кластеризованный индекс (Clustered Index) отличается от некластеризованного (Secondary Index)?",
+        o: ["Кластеризованный индекс хранится в оперативной памяти, а вторичный на SSD", "Листовой уровень кластеризованного индекса содержит сами фактические строки таблицы", "Таблица может иметь до 10 кластеризованных индексов", "Кластеризованный индекс не поддерживает уникальность"],
+        a: 1,
+        e: "Кластеризованный индекс физически организует порядок хранения строк на диске. Поэтому в таблице может быть только один кластеризованный индекс."
+      },
+      {
+        s: "Раздел 5. Индексы и план запроса",
+        q: "31. Что такое селективность индекса?",
+        o: ["Размер индекса в мегабайтах относительно размера таблицы", "Отношение количества уникальных значений столбца к общему числу строк в таблице", "Скорость перестроения индекса при выполнении VACUUM", "Количество таблиц, ссылающихся на данный столбец"],
+        a: 1,
+        e: "Чем выше селективность (больше уникальных значений), тем эффективнее работает B-Tree индекс. Для полей типа boolean индекс часто бесполезен."
+      },
+
+      /* РАЗДЕЛ 6: Транзакции, ACID и уровни изоляции */
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "32. Что означает свойство «Atomicity» (Атомарность) в аббревиатуре ACID?",
+        o: ["Транзакция выполняется на атомарных частотах процессора", "Транзакция выполняется целиком либо не выполняется вовсе (All or Nothing)", "Данные транзакции дробятся на атомы для репликации", "Каждая строка таблицы изолирована от остальных"],
+        a: 1,
+        e: "Атомарность гарантирует: при ошибке на любом шаге весь стек операций транзакции откатывается (ROLLBACK)."
+      },
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "33. Какая аномалия называется «грязным чтением» (Dirty Read)?",
+        o: ["Чтение данных, которые были изменены другой незафиксированной транзакцией (которая может сделать ROLLBACK)", "Повторное чтение строки возвращает другие значения из-за коммита другой транзакции", "Параллельная транзакция вставляет новые строки, попадающие под условие поиска", "Чтение поврежденных блоков данных с диска"],
+        a: 0,
+        e: "Грязное чтение возникает, когда транзакция видит чужие незакоммиченные правки. Блокируется уровнем Read Committed."
+      },
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "34. Какой уровень изоляции транзакций гарантированно предотвращает аномалию фантомного чтения (Phantom Read) согласно стандарту SQL-92?",
+        o: ["Read Uncommitted", "Read Committed", "Repeatable Read", "Serializable"],
+        a: 3,
+        e: "По классическому стандарту ANSI SQL только уровень Serializable гарантирует полное отсутствие фантомов."
+      },
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "35. Как механизм MVCC (Multi-Version Concurrency Control) обеспечивает неблокирующее чтение в PostgreSQL и InnoDB?",
+        o: ["Пишущие транзакции блокируют читающие до момента коммита", "Читающие транзакции видят неизменяемый снимок (snapshot) данных на момент начала запроса или транзакции", "Все транзакции выполняются строго в один поток", "Данные переносятся во временные таблицы в RAM"],
+        a: 1,
+        e: "При MVCC читатели не блокируют писателей, а писатели не блокируют читателей: создаются версии строк."
+      },
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "36. Что такое взаимная блокировка (Deadlock)?",
+        o: ["Сбой жесткого диска в процессе выполнения CHECKPOINT", "Ситуация, когда две или более транзакции взаимно заблокировали ресурсы и бесконечно ждут освобождения друг друга", "Превышение лимита памяти на один SQL-запрос", "Блокировка таблицы администратором через ALTER TABLE"],
+        a: 1,
+        e: "При дедлоке СУБД принудительно прерывает одну из транзакций (victim transaction) и производит откат."
+      },
+      {
+        s: "Раздел 6. Транзакции и ACID",
+        q: "37. Каково назначение журнала упреждающей записи (WAL — Write-Ahead Logging)?",
+        o: ["Формирование красивого отчета для аналитиков", "Гарантия сохранности данных (Durability): изменения сначала пишутся в последовательный лог на диск до сброса страниц в файлы данных", "Защита СУБД от SQL-инъекций", "Удаление устаревших версий строк в фоне"],
+        a: 1,
+        e: "WAL позволяет восстановить целостность базы после внезапного отключения питания без потери подтвержденных транзакций."
+      },
+
+      /* РАЗДЕЛ 7: Процедуры, функции и триггеры */
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "38. В чем главное отличие пользовательской функции (UDF) от хранимой процедуры?",
+        o: ["Функция не принимает параметры", "Функция возвращает значение и может вызываться внутри выражений SELECT / WHERE, а процедура вызывается через CALL/EXEC", "Процедура компилируется на лету, а функция предкомпилирована", "Процедура не может изменять таблицы базы данных"],
+        a: 1,
+        e: "Функции обязаны вернуть скаляр/таблицу и встраиваются в SQL-выражения. Процедуры выполняют сценарии и вызываются автономно."
+      },
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "39. Как в T-SQL (MS SQL Server) триггер получает доступ к измененным или удаленным строкам?",
+        o: ["Через системные переменные OLD.поле и NEW.поле", "Через виртуальные псевдотаблицы inserted и deleted", "Через локальную временную таблицу #buffer", "MS SQL Server не поддерживает чтение старых значений"],
+        a: 1,
+        e: "В T-SQL триггеры срабатывают на всю инструкцию (statement-level), и псевдотаблицы inserted/deleted могут содержать пачки строк."
+      },
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "40. Чем триггер BEFORE (или INSTEAD OF) отличается от триггера AFTER?",
+        o: ["BEFORE выполняется до записи данных на диск и позволяет отменить операцию или изменить значения", "BEFORE работает только с операцией SELECT", "AFTER не имеет доступа к измененным данным", "Разницы в логике исполнения нет"],
+        a: 0,
+        e: "BEFORE срабатывает до физической модификации и валидирует/корректирует кортежи. AFTER активируется, когда операция уже совершена."
+      },
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "41. Что такое детерминированная функция (Deterministic Function) в СУБД?",
+        o: ["Функция, написанная только на чистом ассемблере", "Функция, которая при одинаковых входных аргументах ВСЕГДА возвращает строго одинаковый результат", "Функция, генерирующая случайные числа (RAND)", "Функция, изменяющая метаданные таблиц"],
+        a: 1,
+        e: "Пример: LEN('abc') — детерминированная, а GETDATE() или RANDOM() — недетерминированные."
+      },
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "42. Почему массовое использование бизнес-логики внутри триггеров считается антипаттерном в нагруженных системах?",
+        o: ["Триггеры вызывают скрытые побочные эффекты, усложняют отладку и создают трудноконтролируемые каскадные блокировки", "Триггеры не поддерживают транзакции", "Триггеры разрешены только в PostgreSQL", "Триггеры всегда сбрасывают буферный кэш"],
+        a: 0,
+        e: "Неявное срабатывание логики 'под капотом' ведет к взаимным блокировкам, росту задержек и скрытым каскадам изменений."
+      },
+      {
+        s: "Раздел 7. Хранимый код и триггеры",
+        q: "43. Что произойдет внутри транзакции, если в теле триггера AFTER UPDATE сгенерировано исключение (RAISERROR / THROW)?",
+        o: ["СУБД проигнорирует ошибку и завершит коммит", "Операция вызовет ошибку, и текущая транзакция будет прервана с откатом изменений (ROLLBACK)", "Таблица автоматически заблокируется в режиме READ ONLY", "Изменения запишутся частично"],
+        a: 1,
+        e: "Триггер выполняется в контексте той же транзакции, поэтому ошибка в нем приводит к откату операции."
+      },
+
+      /* РАЗДЕЛ 8: NoSQL, шардирование и теоремы */
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "44. Какая база данных относится к семейству колоночных (Columnar-family / Wide-column)?",
+        o: ["Redis", "MongoDB", "Apache Cassandra", "Neo4j"],
+        a: 2,
+        e: "Redis — Key-Value, MongoDB — Document, Neo4j — Graph, а Cassandra и ScyllaDB — широкие колоночные хранилища."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "45. Что утверждает CAP-теорема Эрика Брюера для распределенных систем?",
+        o: ["Система обязана гарантировать все 3 свойства (C, A, P) одновременно", "При наличии сетевого разделения (Partition tolerance) можно выбрать либо согласованность (Consistency), либо доступность (Availability)", "Реляционные базы данных принципиально не масштабируются", "Распределенная сеть обязана работать без задержек"],
+        a: 1,
+        e: "Поскольку физические сбои сети (P) неизбежны, приходится выбирать компромисс: CP (отказ в ответе ради непротиворечивости) или AP (ответ неактуальными данными)."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "46. Что означает модель согласованности «Eventually Consistent» в NoSQL СУБД?",
+        o: ["Данные никогда не станут согласованными", "При отсутствии новых обновлений через определенный промежуток времени все узлы кластера придут к единому состоянию", "Данные согласованы только по четным секундам", "Согласованность проверяется только вручную администратором"],
+        a: 1,
+        e: "Eventually consistency гарантирует синхронизацию реплик в фоне с некоторой задержкой (replication lag)."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "47. Что такое шардирование (Sharding) базы данных?",
+        o: ["Создание точных копий базы на резервных серверах (репликация)", "Горизонтальное разделение данных (строк) по разным физическим серверам на основе ключа шардирования (Shard Key)", "Сжатие старых логов СУБД архиватором", "Объединение таблиц через виртуальные линки"],
+        a: 1,
+        e: "Шардирование делит гигантскую таблицу на части, разнося их по разным серверам для горизонтального масштабирования записи и объема."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "48. В чем специфика графовых баз данных (Neo4j, Memgraph)?",
+        o: ["Они оптимизированы для построения графиков и диаграмм в Excel", "Данные представляются узлами, ребрами (связями) и свойствами, что дает обход связанных сущностей за O(1) без тяжелых JOIN", "Они хранят только бинарные файлы изображений", "В них полностью запрещено использование индексов"],
+        a: 1,
+        e: "Графовые базы исключают дорогостоящие реляционные JOIN за счет механизма указателей между узлами (index-free adjacency)."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "49. Чем репликация Master-Slave (Primary-Replica) отличается от Master-Master (Multi-Primary)?",
+        o: ["В Master-Slave запись разрешена только на Primary узел, а в Master-Master писать можно на любой узел кластера", "Master-Slave работает без сети", "Multi-Primary запрещает чтение с реплик", "В Master-Master нет конфликтов репликации"],
+        a: 0,
+        e: "В Multi-Primary запись идет на любой мастер, что требует сложных алгоритмов разрешения коллизий (CRDT, LWW)."
+      },
+      {
+        s: "Раздел 8. NoSQL и теоремы распределенных систем",
+        q: "50. Что постулирует расширение теоремы CAP — модель PACELC?",
+        o: ["Если есть Partition (P), выбираем между A и C; Else (E) при штатной работе выбираем между Latency (L) и Consistency (C)", "База данных обязана работать только по протоколу TCP/IP", "Все NoSQL СУБД медленнее реляционных при пакетной записи", "Шардирование невозможно без аппаратного RAID-массива"],
+        a: 0,
+        e: "PACELC объясняет компромиссы и в штатном режиме: жертвуем ли мы задержкой (L) ради немедленной согласованности реплик (C)."
+      }
+    ];
+
+    // State
+    const userAnswers = new Array(questions.length).fill(null);
+    let answeredCount = 0;
+    let correctCount = 0;
+    let wrongCount = 0;
+
+    // DOM Elements
+    const root = document.getElementById('questions-root');
+    const hdrProgress = document.getElementById('hdr-progress');
+    const hdrPct = document.getElementById('hdr-pct');
+    const progressBar = document.getElementById('progress-bar');
+    const statsDrawer = document.getElementById('stats-drawer');
+    const toggleStatsBtn = document.getElementById('toggle-stats-btn');
+    const statTotal = document.getElementById('stat-total');
+    const statCorrect = document.getElementById('stat-correct');
+    const statWrong = document.getElementById('stat-wrong');
+    const matrixGrid = document.getElementById('matrix-grid');
+
+    // Toggle drawer
+    toggleStatsBtn.onclick = () => {
+      statsDrawer.classList.toggle('open');
+      toggleStatsBtn.textContent = statsDrawer.classList.contains('open') ? 'Скрыть' : 'Статистика';
+    };
+
+    // Render Matrix & Cards
+    function init() {
+      root.innerHTML = '';
+      matrixGrid.innerHTML = '';
+
+      let lastSection = "";
+
+      questions.forEach((item, index) => {
+        // Matrix item
+        const mBtn = document.createElement('div');
+        mBtn.className = 'matrix-item';
+        mBtn.id = `matrix-${index}`;
+        mBtn.textContent = index + 1;
+        mBtn.onclick = () => {
+          const el = document.getElementById(`q-card-${index}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (window.innerWidth < 600) {
+              statsDrawer.classList.remove('open');
+              toggleStatsBtn.textContent = 'Статистика';
+            }
+          }
+        };
+        matrixGrid.appendChild(mBtn);
+
+        // Section header
+        if (item.s !== lastSection) {
+          lastSection = item.s;
+          const sHeader = document.createElement('div');
+          sHeader.className = 'section-header';
+          sHeader.textContent = lastSection;
+          root.appendChild(sHeader);
+        }
+
+        // Question card
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.id = `q-card-${index}`;
+
+        const qTitle = document.createElement('div');
+        qTitle.className = 'card-title';
+        qTitle.textContent = item.q;
+        card.appendChild(qTitle);
+
+        const optionsDiv = document.createElement('div');
+        optionsDiv.className = 'options';
+        optionsDiv.id = `opts-${index}`;
+
+        const expl = document.createElement('div');
+        expl.className = 'expl-box';
+        expl.id = `expl-${index}`;
+        expl.innerHTML = `<strong>Разбор:</strong> ${item.e}`;
+
+        item.o.forEach((optText, optIdx) => {
+          const btn = document.createElement('button');
+          btn.className = 'opt-btn';
+          btn.textContent = optText;
+
+          btn.onclick = () => handleAnswer(index, optIdx);
+
+          optionsDiv.appendChild(btn);
+        });
+
+        card.appendChild(optionsDiv);
+        card.appendChild(expl);
+        root.appendChild(card);
+      });
+    }
+
+    function handleAnswer(qIndex, selectedIdx) {
+      if (userAnswers[qIndex] !== null) return;
+
+      const q = questions[qIndex];
+      const isCorrect = (selectedIdx === q.a);
+      userAnswers[qIndex] = { selected: selectedIdx, correct: isCorrect };
+
+      answeredCount++;
+      if (isCorrect) correctCount++; else wrongCount++;
+
+      // UI changes
+      const optsBox = document.getElementById(`opts-${qIndex}`);
+      optsBox.classList.add('disabled');
+
+      const btns = optsBox.children;
+      if (isCorrect) {
+        btns[selectedIdx].classList.add('correct');
+      } else {
+        btns[selectedIdx].classList.add('wrong');
+        btns[q.a].classList.add('correct');
+      }
+
+      document.getElementById(`expl-${qIndex}`).classList.add('show');
+
+      // Update Matrix
+      const mItem = document.getElementById(`matrix-${qIndex}`);
+      if (mItem) {
+        mItem.classList.add(isCorrect ? 'is-correct' : 'is-wrong');
+      }
+
+      updateMetrics();
+    }
+
+    function updateMetrics() {
+      hdrProgress.textContent = `${answeredCount}/50`;
+      const pct = Math.round((answeredCount / 50) * 100);
+      hdrPct.textContent = `${pct}%`;
+      progressBar.style.width = `${pct}%`;
+
+      statTotal.textContent = answeredCount;
+      statCorrect.textContent = correctCount;
+      statWrong.textContent = wrongCount;
+    }
+
+    function resetQuiz() {
+      if (!confirm("Сбросить весь текущий прогресс и начать заново?")) return;
+      userAnswers.fill(null);
+      answeredCount = 0;
+      correctCount = 0;
+      wrongCount = 0;
+      updateMetrics();
+      init();
+    }
+
+    init();
+  </script>
+</body>
+</html>
